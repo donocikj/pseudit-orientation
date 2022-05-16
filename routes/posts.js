@@ -1,6 +1,7 @@
 "use strict";
 
 const express = require(`express`);
+const { send } = require("express/lib/response");
 const router = express.Router();
 
 const connection = require(`../db`);
@@ -14,8 +15,12 @@ router.post('/', submitPost);
 
 
 //put upvote
+router.put(`/:id/upvote`, upVote);
+
 
 //put downvote
+router.put(`/:id/downvote`, downVote);
+
 
 //delete
 
@@ -35,38 +40,34 @@ function submitPost(req, res) {
 
     console.log(post);
 
-    const sql = `INSERT INTO Post (postedOn, title, url, postOwner) VALUES (${connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '))}, ${post.title}, ${post.url}, ${post.owner});`
+    const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) VALUES (${connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '))}, ${post.title}, ${post.url}, ${post.owner});`
 
-    connection.query(sql, post, (error, result) => {
-        if(error) {
-            console.error(error);
-            res.status(500).json({ error: 'error connecting to the database'});
-        } else {
-            res.status(200).json({result}) //todo select the new row to return
-        }
-    })
+    sqlQueryWithErrorHandler(insertStatement, result => {
 
+        retrieveImpactedPost(res, result.insertId);
+
+        // const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(result.insertId)}`;
+        // sqlQueryWithErrorHandler(selectStatement, result => {
+        //     res.status(200).json(rowToPostObject(result[0])); 
+        // });
+    });
 }
 
 
 //retrieves ALL the posts.
 function listPosts(req, res) {
-    const sql = `SELECT * FROM Post ORDER BY postedOn DESC`;
+    const selectStatement = `SELECT * FROM Post ORDER BY postedOn DESC`;
 
-    connection.query(sql, (error, result) => {
-        if(error) {
-            console.error(error);
-            res.status(500).json({ error: 'error connecting to the database'});
-        } else {
-            //compose array of objects to be returned
-            res.status(200).json({posts: composeReturnedPosts(result)});
-        }
-    })
+    sqlQueryWithErrorHandler(selectStatement, (result)=> {
+        //compose array of objects to be returned
+        res.status(200).json({posts: composeReturnedPosts(result)});
+    });
 }
 
 
 module.exports = router;
 
+//turns array of row objects into array of post objects
 function composeReturnedPosts(sqlOutput) {
     let postObjectsArray = [];
 
@@ -96,4 +97,50 @@ function rowToPostObject(rowData) {
         // (Optional) "owner": null, //todo 
         // (Optional) "vote": 1 //todo
     }
+}
+
+function upVote(req, res) {
+    putVote(req, res, 1);
+}
+
+function downVote(req, res) {
+    putVote(req, res, -1);
+}
+
+
+//processes the request to cast a vote
+function putVote(req, res, vote) {
+    //first implementation - free for all
+    // console.log(req.params.id);
+    const updateStatement = `UPDATE Post SET score = score + ${vote} WHERE Id = ${connection.escape(req.params.id)}`;
+
+    sqlQueryWithErrorHandler(updateStatement, result => {
+        // res.send(result);
+        retrieveImpactedPost(res, req.params.id);
+    });
+
+   
+
+}
+
+//select the last impacted post and return it as an object
+function retrieveImpactedPost(res, id) {
+    const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(id)}`;
+        sqlQueryWithErrorHandler(selectStatement, result => {
+            //todo check if result is not empty?
+            res.status(200).json(rowToPostObject(result[0])); 
+    });
+}
+
+
+//outsourcing of error handling
+function sqlQueryWithErrorHandler(query, resultHandler) {
+    connection.query(query, (error, result)=> {
+        if(error) {
+            console.error(error);
+            res.status(500).json({ error: 'error connecting to the database'});
+        } else {
+            resultHandler(result);
+        }
+    })
 }
