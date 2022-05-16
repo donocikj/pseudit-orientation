@@ -1,7 +1,6 @@
 "use strict";
 
 const express = require(`express`);
-const { send } = require("express/lib/response");
 const router = express.Router();
 
 const connection = require(`../db`);
@@ -13,18 +12,17 @@ router.get('/', listPosts);
 //post posts
 router.post('/', submitPost);
 
-
 //put upvote
 router.put(`/:id/upvote`, upVote);
-
 
 //put downvote
 router.put(`/:id/downvote`, downVote);
 
-
 //delete
 
+
 //put (patch?) edit
+
 
 //inserts post into the database
 function submitPost(req, res) {
@@ -35,28 +33,54 @@ function submitPost(req, res) {
         postedOn: new Date(),
         title: connection.escape(req.body.title),
         url: connection.escape(req.body.url),
-        owner: null
     }
 
     console.log(post);
 
-    const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) VALUES (${connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '))}, ${post.title}, ${post.url}, ${post.owner});`
+    let timestamp = connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '));
+    let username = connection.escape(req.headers.username);
+
+    const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) ` +
+                                `VALUES (${timestamp}, `+
+                                        `${post.title}, `+
+                                        `${post.url}, `+
+                                        //`${post.owner});`
+                                        //once again ugly but no point bothering with it without proper authentication
+                                        `(SELECT pseuditor.Id FROM pseuditor WHERE pseuditor.username = ${username}) )` 
 
     sqlQueryWithErrorHandler(insertStatement, result => {
 
-        retrieveImpactedPost(res, result.insertId);
-
-        // const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(result.insertId)}`;
-        // sqlQueryWithErrorHandler(selectStatement, result => {
-        //     res.status(200).json(rowToPostObject(result[0])); 
-        // });
+        retrieveImpactedPost(res, result.insertId, username);
     });
 }
 
 
 //retrieves ALL the posts.
 function listPosts(req, res) {
-    const selectStatement = `SELECT * FROM Post ORDER BY postedOn DESC`;
+    //const selectStatement = `SELECT * FROM Post ORDER BY postedOn DESC`;
+
+    //retrieve username from headers
+    let username = connection.escape(req.headers.username);
+    console.log(username);
+
+    //oh boy.
+    const selectStatement = `SELECT Post.Id as POST_ID, ` +
+                                    `title, `+
+                                    `url, `+
+                                    `postedOn,  `+
+                                    `username,  `+
+                                    `SUM(Vote) AS score, `+
+                                    `(select Vote ` + //subquery for "My" posts
+                                    `    FROM Post ` + 
+                                    `    INNER JOIN vote ON post.Id = vote.PostId ` +
+                                    `    INNER JOIN pseuditor ON vote.userID = pseuditor.Id ` +
+                                    `    WHERE pseuditor.username=${username} AND POST_ID=vote.PostId) as myvote `+
+    //that last part could probably use some work but I ain't touching it unless I get around to some proper authentication.
+                                    `FROM Post `+
+                                    `   LEFT JOIN pseuditor ON post.postOwner=pseuditor.Id `+
+                                    `   LEFT JOIN vote ON post.Id = vote.PostID `+
+                                    `GROUP BY Post.Id ` +
+                                    `ORDER BY postedOn DESC`;
 
     sqlQueryWithErrorHandler(selectStatement, (result)=> {
         //compose array of objects to be returned
@@ -89,13 +113,13 @@ function rowToPostObject(rowData) {
         // console.log(myDate.getMilliseconds());
         // console.log(myDate.valueOf());
 
-        id: rowData.Id,
+        id: rowData.POST_ID,
         title: rowData.title,
         url: rowData.url,
         timestamp: new Date(rowData.postedOn).valueOf(),
-        score: rowData.score, //todo refactor
-        // (Optional) "owner": null, //todo 
-        // (Optional) "vote": 1 //todo
+        score: (rowData.score=== null? 0 : rowData.score),
+        owner: rowData.username,
+        vote:  (rowData.myvote === null? 0 : rowData.myvote)
     }
 }
 
@@ -112,22 +136,63 @@ function downVote(req, res) {
 function putVote(req, res, vote) {
     //first implementation - free for all
     // console.log(req.params.id);
-    const updateStatement = `UPDATE Post SET score = score + ${vote} WHERE Id = ${connection.escape(req.params.id)}`;
+    //const updateStatement = `UPDATE Post SET score = score + ${vote} WHERE Id = ${connection.escape(req.params.id)}`;
+    //let username = connection.escape(req.headers.username);
 
-    sqlQueryWithErrorHandler(updateStatement, result => {
+    //sqlQueryWithErrorHandler(updateStatement, () => {
         // res.send(result);
-        retrieveImpactedPost(res, req.params.id);
+    //    retrieveImpactedPost(res, req.params.id, username);
+    //});
+
+    //refactored: insert into .. on duplicate key update for votes table
+    let postId = connection.escape(req.params.id);
+    let username = connection.escape(req.headers.username);
+
+    const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
+                                    `VALUES ( `+
+                                    `   ${postId}, `+
+                                    `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
+                                    `   ${vote} `+
+                                    `) ` +
+                                    `ON DUPLICATE KEY UPDATE vote = ${vote}`;
+
+    sqlQueryWithErrorHandler(insertStatement, (result)=> {
+        console.log(result);
+        retrieveImpactedPost(res, req.params.id, username);
     });
 
-   
+    // user check (invalid username)?
+    // post check (nonexistent post)?
+
 
 }
 
 //select the last impacted post and return it as an object
-function retrieveImpactedPost(res, id) {
-    const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(id)}`;
+function retrieveImpactedPost(res, id, username) {
+    //const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(id)}`;
+
+    const selectStatement = `SELECT Post.Id as POST_ID, ` +
+                                    `title, `+
+                                    `url, `+
+                                    `postedOn,  `+
+                                    `username,  `+
+                                    `SUM(Vote) AS score, `+
+                                    `(select Vote ` + //subquery for "My" posts
+                                    `    FROM Post ` + 
+                                    `    INNER JOIN vote ON post.Id = vote.PostId ` +
+                                    `    INNER JOIN pseuditor ON vote.UserID = pseuditor.Id ` +
+                                    `    WHERE pseuditor.username=${username} AND POST_ID=vote.PostId) as myvote `+
+    //that last part could probably use some work but I ain't touching it unless I get around to some proper authentication.
+                                    `FROM Post `+
+                                    `   LEFT JOIN pseuditor ON post.postOwner=pseuditor.Id `+
+                                    `   LEFT JOIN vote ON post.Id = vote.PostID `+
+                                    `WHERE Post.Id = ${id} ` +
+                                    `GROUP BY Post.Id `;
+
+
         sqlQueryWithErrorHandler(selectStatement, result => {
             //todo check if result is not empty?
+            console.log(result);
             res.status(200).json(rowToPostObject(result[0])); 
     });
 }
@@ -142,5 +207,5 @@ function sqlQueryWithErrorHandler(query, resultHandler) {
         } else {
             resultHandler(result);
         }
-    })
+    });
 }
