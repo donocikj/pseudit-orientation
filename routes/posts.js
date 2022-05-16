@@ -1,6 +1,7 @@
 "use strict";
 
 const express = require(`express`);
+const { connect } = require("../db");
 const router = express.Router();
 
 const connection = require(`../db`);
@@ -144,26 +145,51 @@ function putVote(req, res, vote) {
     //    retrieveImpactedPost(res, req.params.id, username);
     //});
 
-    //refactored: insert into .. on duplicate key update for votes table
-    let postId = connection.escape(req.params.id);
-    let username = connection.escape(req.headers.username);
+    
+    // if(!isUsernameValid(req.headers.username)) {
+    //     // user check (invalid username)?
+    //     res.status(403).json({error: "not authorized to vote"});
+    // } else if(!isPostNumberValid(req.params.id)) {
+    //     // post check (nonexistent post)
+    //     res.status(404).json({error: "post not found"});
+    // } else {
 
-    const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
-                                    `VALUES ( `+
-                                    `   ${postId}, `+
-                                    `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
-                                    `   ${vote} `+
-                                    `) ` +
-                                    `ON DUPLICATE KEY UPDATE vote = ${vote}`;
+    isUsernameValid(req.headers.username, (usernameOk)=> { //this sounds like a horrible, horrible, horrible idea
+        if(!usernameOk) {
+            res.status(403).json({error: "not authorized to vote"});
+        } else {
+            isPostNumberValid(req.params.id, (idOk) => {
+                if(!idOk) {
+                    res.status(404).json({error: "post not found"});
+                } else {
+                    //this is where checking callbacks allow for the query proper
 
-    sqlQueryWithErrorHandler(insertStatement, (result)=> {
-        console.log(result);
-        retrieveImpactedPost(res, req.params.id, username);
+
+                    
+                    
+                    // insert into .. on duplicate key update for votes table
+                    let postId = connection.escape(req.params.id);
+                    let username = connection.escape(req.headers.username);
+                    
+                    const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
+                    `VALUES ( `+
+                    `   ${postId}, `+
+                    `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
+                    `   ${vote} `+
+                    `) ` +
+                    `ON DUPLICATE KEY UPDATE vote = ${vote}`;
+                    
+                    sqlQueryWithErrorHandler(insertStatement, (result)=> {
+                        console.log(result);
+                        retrieveImpactedPost(res, req.params.id, username);
+                    });
+                
+                    
+                    //thi is where checking callbacks end
+                }
+            });
+        }
     });
-
-    // user check (invalid username)?
-    // post check (nonexistent post)?
-
 
 }
 
@@ -202,10 +228,46 @@ function retrieveImpactedPost(res, id, username) {
 function sqlQueryWithErrorHandler(query, resultHandler) {
     connection.query(query, (error, result)=> {
         if(error) {
-            console.error(error);
-            res.status(500).json({ error: 'error connecting to the database'});
+            databaseError(error);
         } else {
             resultHandler(result);
         }
     });
+}
+
+//this is getting a bit long, maybe I should break this up?
+//nah.
+
+//TODO deal with the query delay.
+
+//returns true if database has a user in it, false otherwise
+function isUsernameValid (username, callback) {
+    const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${connection.escape(username)}`;
+    let outcome = false;
+    connection.query(select, (error, result) =>{
+    //sqlQueryWithErrorHandler(select, result => {
+        if(error) databaseError(error);
+        console.log(result);
+        outcome = result[0]['COUNT(*)'] !== 0;
+        
+        callback(outcome);
+    });
+}
+
+//returns true if database has post with given id in it, false otherwise
+function isPostNumberValid (id, callback) {
+    const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${connection.escape(id)}`;
+    let outcome = false;
+    connection.query(select, (error, result) =>{
+        //sqlQueryWithErrorHandler(select, result => {
+        if(error) databaseError(error);
+        console.log(result);
+        outcome = result[0]['COUNT(*)'] !== 0;
+        callback(outcome);
+    });
+}
+
+function databaseError(error) {
+    console.error(error);
+    res.status(500).json({ error: 'error connecting to the database'});
 }

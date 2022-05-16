@@ -8,6 +8,7 @@ CREATE TABLE Post (
 	Id BIGINT UNIQUE NOT NULL auto_increment,
     postedOn TIMESTAMP NOT NULL,
     title VARCHAR(255) DEFAULT "",
+    url VARCHAR(255) DEFAULT "",
     postOwner BIGINT,
     PRIMARY KEY(Id));
     
@@ -27,5 +28,6 @@ CREATE TABLE Vote (
     FOREIGN KEY (UserID) REFERENCES Pseuditor(Id));
 
 -- ALTER TABLE Post DROP COLUMN score;
+INSERT INTO pseuditor (username) VALUES ('karl'), ('testuser'), ('nn'), ('sheev'); 
 
     
