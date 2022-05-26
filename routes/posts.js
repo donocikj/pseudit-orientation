@@ -1,7 +1,6 @@
 "use strict";
 
 const express = require(`express`);
-const { connect } = require("../db");
 const router = express.Router();
 
 const connection = require(`../db`);
@@ -130,6 +129,10 @@ function upVote(req, res) {
 
 function downVote(req, res) {
     putVote(req, res, -1);
+}
+
+function cancelVote(req, res) {
+    putVote(req, res, 0);
 }
 
 

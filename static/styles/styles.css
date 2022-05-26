@@ -2,3 +2,50 @@
     font-family: 'Lato', sans-serif;
     border: thin red solid;
 }
+
+header {
+    min-height: 333px;
+    display: grid;
+    justify-items: start;
+    align-items: center;
+    padding: 77px;
+
+    text-transform: uppercase;
+    color:deepskyblue;
+    font-size: 77px;
+    letter-spacing: 42px;
+
+    background-image: url("/static/assets/earthrise.jpg");
+    background-position: center;
+    background-size: cover;
+
+}
+
+header.expanded {
+    min-height: 1000px;
+}
+
+div.content{
+    display: grid;
+    grid-template-columns: auto 23%;
+}
+
+aside {
+    grid-column: 2;
+}
+
+ul {
+    padding: 20px;
+}
+
+main {
+    grid-column: 1;
+    grid-row-start: 1;
+}
+
+div.container {
+    display: grid;
+    grid-template-columns: 42px auto;
+    grid-template-rows: repeat(5, minmax(2em, auto));
+}
+
