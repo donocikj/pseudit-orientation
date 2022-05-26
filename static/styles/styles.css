@@ -100,6 +100,17 @@ main {
     margin: 13px;
 }
 
+.container .tools{
+    grid-column: 2;
+    grid-row: 5;
+    display: flex;
+    gap: 15px;
+}
+
+.container .tools a {
+    cursor: pointer;
+}
+
 .container h3 {
     grid-column: 2/4;
     grid-row: 2;
@@ -112,18 +123,24 @@ main {
     align-self: center;
 }
 
-.container .scoreField{
-    grid-column: 1;
-    grid-row: 3;
-    text-align: center;
-    line-height: 1.7;
-}
-
 .container time {
     font-family: monospace;
     align-self: center;
     grid-column: 2;
     grid-row: 4;
+}
+
+.container .votes{
+    grid-column: 1;
+    grid-row: 2 / span 3;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.container .scoreField{ 
+    text-align: center;
+    line-height: 1.7;
 }
 
 .container .ownerField{

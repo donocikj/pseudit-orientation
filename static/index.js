@@ -32,7 +32,7 @@ document.querySelector(`#cancelSubmission`).addEventListener(`click`,hideSubmiss
 
 
 //upvote, downvote
-mainElement.addEventListener(`click`, possibleVoteCast);
+mainElement.addEventListener(`click`, mainAreaClick);
 
 
 
@@ -41,6 +41,7 @@ mainElement.addEventListener(`click`, possibleVoteCast);
 
 
 //delete
+
 
 
 ///////////////////////////
@@ -111,14 +112,20 @@ function hideSubmissionForm() {
 }
 
 //click has been registered in the main area, possible vote
-function possibleVoteCast(e) {
-    //console.log(e.target);
+function mainAreaClick(e) {
+    console.log(e.composedPath());
     if(e.target.classList.contains(`up`)) {
         console.log(`upvoting post ${e.target.getAttribute(`data-postId`)} :)`);
         upVote(e.target.getAttribute(`data-postId`));
     } else if (e.target.classList.contains(`down`)) {
         console.log(`downvoting post ${e.target.getAttribute(`data-postId`)} >:(`);
         downVote(e.target.getAttribute(`data-postId`));
+    } else if (e.target.classList.contains(`modify`)) {
+        console.log(`attempting to edit post ${e.composedPath()[2].getAttribute(`data-id`)}`);
+        modifyPost(e.composedPath()[2]);
+    } else if (e.target.classList.contains(`delete`)) {
+        console.log(`attempting to delete post ${e.composedPath()[2].getAttribute(`data-id`)}`);
+        deletePost(e.composedPath()[2].getAttribute(`data-id`));
     }
 }
 
@@ -145,12 +152,6 @@ function createPostElement(post) {
     postLink.textContent = post.url;
     containerDiv.appendChild(postLink);
 
-    //score
-    let scoreField = document.createElement(`div`);
-    scoreField.textContent = post.score;
-    scoreField.classList.add(`scoreField`);
-    containerDiv.appendChild(scoreField);
-
     //timestamp
     let timestampField = document.createElement(`time`);
     timestampField.textContent = `last modified: ` + howLongAgo(post.timestamp);
@@ -162,22 +163,50 @@ function createPostElement(post) {
     ownerField.classList.add(`ownerField`);
     containerDiv.appendChild(ownerField);
     
-    //decorations (upboat, downboat,
+    //score
+    let voteField = document.createElement(`div`);
+    voteField.classList.add(`votes`);
+
+    //upvote
     let upvoteImg = document.createElement(`img`);
     upvoteImg.classList.add(`up`);
     upvoteImg.setAttribute(`src`, `/static/assets/upvote.png`); //todo check logged in user
     upvoteImg.setAttribute(`alt`, `upvote the post ${post.id}`); //
     upvoteImg.setAttribute(`data-postId`, post.id)
-    containerDiv.appendChild(upvoteImg);
+    voteField.appendChild(upvoteImg);
 
+    //score count
+    let scoreField = document.createElement(`div`);
+    scoreField.textContent = post.score;
+    scoreField.classList.add(`scoreField`);
+    voteField.appendChild(scoreField);
+
+    //downvote
     let downvoteImg = document.createElement(`img`);
     downvoteImg.classList.add(`down`);
     downvoteImg.setAttribute(`src`, `/static/assets/downvote.png`); //todo check logged in user
     downvoteImg.setAttribute(`alt`, `downvote the post ${post.id}`); //
     downvoteImg.setAttribute(`data-postId`, post.id)
-    containerDiv.appendChild(downvoteImg);
+    voteField.appendChild(downvoteImg);
+
+    containerDiv.appendChild(voteField);
+
 
     // modify, delete)
+    let toolDiv = document.createElement(`div`);
+    toolDiv.classList.add(`tools`);
+
+    let modifyLink = document.createElement(`a`);
+    modifyLink.classList.add(`modify`);
+    modifyLink.textContent = `Modify`;
+    toolDiv.appendChild(modifyLink);
+
+    let deleteLink = document.createElement(`a`);
+    deleteLink.classList.add(`delete`);
+    deleteLink.textContent = `Delete`;
+    toolDiv.appendChild(deleteLink);
+
+    containerDiv.appendChild(toolDiv);
 
 
 
@@ -190,6 +219,44 @@ function createPostElement(post) {
 
 }
 
+//upvotes a post
+function upVote(id) {
+    vote(id, `up`);
+}
+
+//downvotes a post
+function downVote(id) {
+    vote(id, `down`);
+}
+
+function vote(id, direction) {
+    fetch(`/posts/${id}/${direction}vote`, {
+        method: `PUT`
+        //headers
+    }).then(
+        result => console.log(result),
+        problem => console.error(problem)
+    );
+}
+
+//receives handle to container element of a post to be modified. Should substitute the container for a modification form.
+function modifyPost(postContainer) {
+
+}
+
+//receives id of post to be deleted
+function deletePost(id) {
+    fetch(`/posts/${id}`, {
+        method: `DELETE`
+        //headers
+    }).then(
+        result => {
+            console.log(result);
+            location.reload(true);
+        },
+        problem => console.error(problem)
+    );
+}
 
 //this hideous monstrosity generates a string describing how long ago something happened... sort of.
 function howLongAgo(timestamp) {
