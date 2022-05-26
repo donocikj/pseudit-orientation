@@ -1,6 +1,10 @@
 * {
     font-family: 'Lato', sans-serif;
-    border: thin red solid;
+    /* border: thin red solid; */
+}
+
+body {
+    background-color: gainsboro;
 }
 
 header {
@@ -21,6 +25,10 @@ header {
 
 }
 
+aside > *, .container {
+    background-color: azure;
+}
+
 header.expanded {
     min-height: 1000px;
 }
@@ -32,6 +40,46 @@ div.content{
 
 aside {
     grid-column: 2;
+    position: relative;
+}
+
+aside > * {
+    margin: 13px 13px 13px 0;
+}
+
+nav {
+    display:flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 5em;
+
+}
+
+button {
+    width: 96%;
+    padding: 2%;
+
+    text-transform: uppercase;
+    font-size: 1.3rem;
+    font-weight: bold;
+
+    color: white;
+    background-color: skyblue;
+}
+
+button:hover {
+    color:navy;
+    background-color: aqua;
+}
+
+aside > div {
+
+    padding: 10px;
+
+}
+
+aside h2 {
+    margin-bottom: 10px;
 }
 
 ul {
@@ -43,9 +91,65 @@ main {
     grid-row-start: 1;
 }
 
+
 div.container {
     display: grid;
-    grid-template-columns: 42px auto;
+    grid-template-columns: 77px 1fr 1fr;
     grid-template-rows: repeat(5, minmax(2em, auto));
+    padding: 10px;
+    margin: 13px;
 }
 
+div.container h3 {
+    grid-column: 2/4;
+    grid-row: 2;
+}
+
+div.container a {
+    grid-column: 2/4;
+    grid-row: 3;
+}
+
+div.container .scoreField{
+    grid-column: 1;
+    grid-row: 3;
+    text-align: center;
+    line-height: 1.7;
+}
+
+div.container time {
+    font-family: monospace;
+    line-height: 2;
+    grid-column: 2;
+    grid-row: 4;
+}
+
+div.container .ownerField{
+    grid-column: 3;
+    grid-row: 4;
+    justify-self: end;
+    padding-right: 77px;
+}
+
+div.container img{
+    justify-self: center;
+    align-self: center;
+    height: 80%;
+    cursor: pointer;
+}
+
+div.container img:hover{
+    border-radius: 25%;
+    border: medium navy solid;
+}
+
+div.container img.up{
+    grid-column: 1;
+    grid-row: 2;
+}
+
+div.container img.down{
+    grid-column: 1;
+    grid-row: 4;
+
+}
