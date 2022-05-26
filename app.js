@@ -7,12 +7,16 @@ const express = require('express');
 const app = express();
 
 const postRoutes = require(`./routes/posts`)
+
 app.use(`/posts`, postRoutes)
+
+app.use(`/static`, express.static(`./static`));
+
 // app.use(express.json());
 
 app.get(`/`, (req, res)=> {
-    console.log(req.headers);
-    res.send(`aok`);
+    //console.log(req.headers);
+    res.status(200).sendFile(__dirname + `/static/index.html`);
 });
 
 app.listen(PORT, (error)=> {
