@@ -92,7 +92,7 @@ main {
 }
 
 
-div.container {
+.container {
     display: grid;
     grid-template-columns: 77px 1fr 1fr;
     grid-template-rows: repeat(5, minmax(2em, auto));
@@ -100,56 +100,98 @@ div.container {
     margin: 13px;
 }
 
-div.container h3 {
+.container h3 {
     grid-column: 2/4;
     grid-row: 2;
 }
 
-div.container a {
+.container .postUrl {
     grid-column: 2/4;
     grid-row: 3;
+    justify-self: start;
+    align-self: center;
 }
 
-div.container .scoreField{
+.container .scoreField{
     grid-column: 1;
     grid-row: 3;
     text-align: center;
     line-height: 1.7;
 }
 
-div.container time {
+.container time {
     font-family: monospace;
-    line-height: 2;
+    align-self: center;
     grid-column: 2;
     grid-row: 4;
 }
 
-div.container .ownerField{
+.container .ownerField{
     grid-column: 3;
     grid-row: 4;
     justify-self: end;
     padding-right: 77px;
 }
 
-div.container img{
+.container img{
     justify-self: center;
     align-self: center;
-    height: 80%;
+    height: 2em;
     cursor: pointer;
 }
 
-div.container img:hover{
+.container img:hover{
     border-radius: 25%;
     border: medium navy solid;
 }
 
-div.container img.up{
+.container img.up{
     grid-column: 1;
     grid-row: 2;
 }
 
-div.container img.down{
+.container img.down{
     grid-column: 1;
     grid-row: 4;
+
+}
+
+/* form elements */
+
+.container #titleLabel {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.container #urlLabel {
+    grid-column: 1;
+    grid-row: 3;
+}
+
+.container #linkTitle {
+    grid-column: 2/4;
+    grid-row: 2;
+}
+
+.container #linkUrl {
+    grid-column: 2/4;
+    grid-row: 3;
+
+}
+
+.container button {
+    margin: 5px;
+}
+
+.container #submitNewPost {
+    grid-column: 3;
+    grid-row: 4;
+}
+
+.container #cancelSubmission {
+    grid-column: 3;
+    grid-row: 1;
+    width: 42px;
+    justify-self: end;
 
 }

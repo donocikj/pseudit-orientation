@@ -2,9 +2,10 @@
 
 
 const mainElement = document.querySelector(`main`);
+const submissionForm = document.querySelector(`#submissionForm`);
 
 const postList = { posts: [] };
-const SERVER = `http://127.0.0.1:3000`;
+
 
 //let user = 'anonymous'
 
@@ -22,33 +23,83 @@ document.querySelector(`header`).addEventListener(`click`, (e) => {
 document.addEventListener(`DOMContentLoaded`, fetchAllPosts)
 
 //submit button - create form for entering new post
+document.querySelector(`#submissionFormButton`).addEventListener(`click`, showSubmissionForm);
+//submit button in the form for actually sending the data
+document.querySelector(`#submitNewPost`).addEventListener(`click`,submitPost);
+//cancel button in the form for hiding the form
+document.querySelector(`#cancelSubmission`).addEventListener(`click`,hideSubmissionForm);
+
+
 
 //upvote, downvote
 
+
+
+
 //modify
+
 
 //delete
 
 
 ///////////////////////////
 //implementation 
+
+//retrieve all posts from the database by accessing the appropriate GET endpoint of backend.
 function fetchAllPosts(e) {
     console.log(e);
 
-    fetch(SERVER + `/posts/`)
+    fetch(`/posts/`)
     //examine response for statuses...
         .then(response => response.json())
     //examine the post list
         .then(returnObject => {
             console.log(returnObject)
             postList.posts = []; //make sure it's empty
+            mainElement.innerHTML = ``;
             returnObject.posts.forEach(post => { 
                 //foreach - create element and save it to the variable for future reference
                 let newPost = createPostElement(post);
                 postList.posts.push(newPost);
             });
+            console.log(submissionForm);
         })
         .catch(problem => console.error(problem));
+}
+
+//creates a form element on top of existing posts to fill in.
+function showSubmissionForm(e) {
+    console.log(e);
+
+    // let submitFormElement = document.createElement(`form`);
+    // submitFormElement.classList.add(`container`);
+    mainElement.prepend(submissionForm);
+}
+
+//makes the main element disown the form
+function hideSubmissionForm() {
+    mainElement.removeChild(submissionForm);
+}
+
+//gathers the information and sends it to the server to appropriate endpoint for insertion
+function submitPost(e) {
+    e.preventDefault();
+    const newPost = {
+        title: document.forms.submissionForm.title.value,
+        url: document.forms.submissionForm.url.value
+    }
+
+    fetch(`/posts`, {
+        method: `POST`,
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(newPost)
+    })
+    .then(response => {
+           location.reload(); 
+        }, problem => console.error(problem));
+
 }
 
 
@@ -69,6 +120,7 @@ function createPostElement(post) {
 
     //link
     let postLink = document.createElement(`a`);
+    postLink.classList.add(`postUrl`);
     postLink.setAttribute(`href`, post.url);
     postLink.textContent = post.url;
     containerDiv.appendChild(postLink);
@@ -111,7 +163,7 @@ function createPostElement(post) {
 
 
     //prepend to main
-    mainElement.prepend(containerDiv);
+    mainElement.appendChild(containerDiv);
     return containerDiv;
 
 }

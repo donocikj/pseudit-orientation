@@ -20,7 +20,7 @@
             <nav>
                 <div id="loginContainer"></div>
             </nav>
-            <button>Submit a new post</button>
+            <button id="submissionFormButton">Submit a new post</button>
             
             <div>
                 <h2>About <a href="#">p/Space</a></h2>
@@ -36,6 +36,14 @@
         </aside>
 
         <main>
+            <form class="container" id="submissionForm" name="submissionForm" action="/posts" method="POST">
+                <label id="titleLabel" for="linkTitle">Title: </label>
+                <input id="linkTitle" name="title" type="text" required>
+                <label id="urlLabel" for="linkUrl">Url: </label>
+                <input id="linkUrl" name="url" type="url" required>
+                <button id="submitNewPost" type="submit">Submit</button>
+                <button id="cancelSubmission" type="button">X</button>
+            </form>
         </main>
     </div>
 </body>
