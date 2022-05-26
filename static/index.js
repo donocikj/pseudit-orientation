@@ -25,13 +25,14 @@ document.addEventListener(`DOMContentLoaded`, fetchAllPosts)
 //submit button - create form for entering new post
 document.querySelector(`#submissionFormButton`).addEventListener(`click`, showSubmissionForm);
 //submit button in the form for actually sending the data
-document.querySelector(`#submitNewPost`).addEventListener(`click`,submitPost);
+submissionForm.addEventListener(`submit`,submitPost);
 //cancel button in the form for hiding the form
 document.querySelector(`#cancelSubmission`).addEventListener(`click`,hideSubmissionForm);
 
 
 
 //upvote, downvote
+mainElement.addEventListener(`click`, possibleVoteCast);
 
 
 
@@ -76,11 +77,6 @@ function showSubmissionForm(e) {
     mainElement.prepend(submissionForm);
 }
 
-//makes the main element disown the form
-function hideSubmissionForm() {
-    mainElement.removeChild(submissionForm);
-}
-
 //gathers the information and sends it to the server to appropriate endpoint for insertion
 function submitPost(e) {
     e.preventDefault();
@@ -89,6 +85,10 @@ function submitPost(e) {
         url: document.forms.submissionForm.url.value
     }
 
+    // submissionForm.checkValidity();
+    // let okToSend = submissionForm.reportValidity()
+    // if(okToSend) {
+
     fetch(`/posts`, {
         method: `POST`,
         headers: {
@@ -96,10 +96,30 @@ function submitPost(e) {
         },
         body: JSON.stringify(newPost)
     })
-    .then(response => {
-           location.reload(); 
+    .then(response => {   
+            location.reload(true);         
         }, problem => console.error(problem));
 
+    // }
+
+    // if(okToSend) location.reload();
+}
+
+//makes the main element disown the form
+function hideSubmissionForm() {
+    mainElement.removeChild(submissionForm);
+}
+
+//click has been registered in the main area, possible vote
+function possibleVoteCast(e) {
+    //console.log(e.target);
+    if(e.target.classList.contains(`up`)) {
+        console.log(`upvoting post ${e.target.getAttribute(`data-postId`)} :)`);
+        upVote(e.target.getAttribute(`data-postId`));
+    } else if (e.target.classList.contains(`down`)) {
+        console.log(`downvoting post ${e.target.getAttribute(`data-postId`)} >:(`);
+        downVote(e.target.getAttribute(`data-postId`));
+    }
 }
 
 
@@ -147,12 +167,14 @@ function createPostElement(post) {
     upvoteImg.classList.add(`up`);
     upvoteImg.setAttribute(`src`, `/static/assets/upvote.png`); //todo check logged in user
     upvoteImg.setAttribute(`alt`, `upvote the post ${post.id}`); //
+    upvoteImg.setAttribute(`data-postId`, post.id)
     containerDiv.appendChild(upvoteImg);
 
     let downvoteImg = document.createElement(`img`);
     downvoteImg.classList.add(`down`);
     downvoteImg.setAttribute(`src`, `/static/assets/downvote.png`); //todo check logged in user
     downvoteImg.setAttribute(`alt`, `downvote the post ${post.id}`); //
+    downvoteImg.setAttribute(`data-postId`, post.id)
     containerDiv.appendChild(downvoteImg);
 
     // modify, delete)
@@ -162,20 +184,25 @@ function createPostElement(post) {
     //compare owner with username
 
 
-    //prepend to main
+    //append to main
     mainElement.appendChild(containerDiv);
     return containerDiv;
 
 }
 
+
+//this hideous monstrosity generates a string describing how long ago something happened... sort of.
 function howLongAgo(timestamp) {
     const now = new Date();
+    
     let diff = now - timestamp;
 
     const second = 1000;
     const minute = 60 * second;
     const hour = 60 * minute;
     const day = 24 * hour;
+
+    diff += now.getTimezoneOffset() * minute;
 
     if (diff <= second) return `just now`;
 
@@ -189,12 +216,5 @@ function howLongAgo(timestamp) {
 
     return `${ago[0]!==0 ? ago[0] + " days " : ""}${ago[1]!==0 ? ago[1] + " hours " : ""}`+
            `${ago[2]!==0 ? ago[2] + " minutes " : ""}${ago[3]!==0 ? ago[3] + " seconds " : ""}`
-
-    //const ago = {}
-    // ago.days = Math.floor(diff / day);
-    // diff -= ago.days * day;
-
-    // ago.hours = Math.floor(diff / hour);
-    // diff -= ago.hours * hour;
     
 }

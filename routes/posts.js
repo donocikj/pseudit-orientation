@@ -6,6 +6,8 @@ const router = express.Router();
 const connection = require(`../db`);
 
 router.use(express.json());
+
+
 //get posts
 router.get('/', listPosts);
 
@@ -18,42 +20,18 @@ router.put(`/:id/upvote`, upVote);
 //put downvote
 router.put(`/:id/downvote`, downVote);
 
+//put vote cancel
+router.put(`/:id/cancelvote`, cancelVote)
+
 //delete
+router.delete(`/:id/`, deletePost);
 
 
 //put (patch?) edit
 
-
-//inserts post into the database
-function submitPost(req, res) {
-
-    console.log(req.body);
-
-    let post = {
-        postedOn: new Date(),
-        title: connection.escape(req.body.title),
-        url: connection.escape(req.body.url),
-    }
-
-    console.log(post);
-
-    let timestamp = connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '));
-    let username = connection.escape(req.headers.username);
-
-    const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) ` +
-                                `VALUES (${timestamp}, `+
-                                        `${post.title}, `+
-                                        `${post.url}, `+
-                                        //`${post.owner});`
-                                        //once again ugly but no point bothering with it without proper authentication
-                                        `(SELECT pseuditor.Id FROM pseuditor WHERE pseuditor.username = ${username}) )` 
-
-    sqlQueryWithErrorHandler(insertStatement, result => {
-
-        retrieveImpactedPost(res, result.insertId, username);
-    });
-}
-
+/////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+//endpoint functions
 
 //retrieves ALL the posts.
 function listPosts(req, res) {
@@ -82,17 +60,80 @@ function listPosts(req, res) {
                                     `GROUP BY Post.Id ` +
                                     `ORDER BY postedOn DESC`;
 
-    sqlQueryWithErrorHandler(selectStatement, (result)=> {
-        //compose array of objects to be returned
-        res.status(200).json({posts: composeReturnedPosts(result)});
-    });
+    // sqlQueryWithErrorHandler(selectStatement, (result)=> {
+    //     //compose array of objects to be returned
+    //     res.status(200).json({posts: rowListToObjectList(result)});
+    // });
+
+    handleSqlWithError(selectStatement, res)
+        .then(result => sendToFrontend(200, {posts: rowListToObjectList(result)}, res));
 }
 
+//inserts post into the database
+function submitPost(req, res) {
 
-module.exports = router;
+    console.log(req.body);
+
+    let post = {
+        postedOn: new Date(),
+        title: connection.escape(req.body.title),
+        url: connection.escape(req.body.url),
+    }
+
+    console.log(post);
+
+    let timestamp = connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '));
+    let username = connection.escape(req.headers.username);
+
+    const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) ` +
+                                `VALUES (${timestamp}, `+
+                                        `${post.title}, `+
+                                        `${post.url}, `+
+                                        //`${post.owner});`
+                                        //once again ugly but no point bothering with it without proper authentication
+                                        `(SELECT pseuditor.Id FROM pseuditor WHERE pseuditor.username = ${username}) )` 
+
+    // sqlQueryWithErrorHandler(insertStatement, result => {
+
+    //     retrieveImpactedPost(res, result.insertId, username);
+    // });
+
+    handleSqlWithError(insertStatement, res)
+        .then(result=> {
+            retrieveImpactedPost(res, result.insertId, username);
+    });
+
+}
+
+//adds a +1 vote from logged in user
+function upVote(req, res) {
+    putVoteAsync(req, res, 1);
+}
+
+//adds a -1 vote from logged in user
+function downVote(req, res) {
+    putVoteAsync(req, res, -1);
+}
+
+//replaces previous vote by logged in user to 0 (he will never be freed of shame of being associated with this particular post)
+function cancelVote(req, res) {
+    putVoteAsync(req, res, 0);
+}
+
+//delete the post with given identifier... if it's yours. Alright maybe the user who cancelled a vote may be released after all by the power of CASCADE
+function deletePost(req, res) {
+
+}
+
+//update the post with given identifier
+
+
+///////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////
+//helper functions
 
 //turns array of row objects into array of post objects
-function composeReturnedPosts(sqlOutput) {
+function rowListToObjectList(sqlOutput) {
     let postObjectsArray = [];
 
     sqlOutput.forEach(row => {
@@ -102,7 +143,7 @@ function composeReturnedPosts(sqlOutput) {
     return postObjectsArray;
 }
 
-
+//converts table output row to object defined by API
 function rowToPostObject(rowData) {
     return {
 
@@ -123,78 +164,42 @@ function rowToPostObject(rowData) {
     }
 }
 
-function upVote(req, res) {
-    putVote(req, res, 1);
-}
+//cast vote, +1, -1 or 0
+async function putVoteAsync(req, res, vote) {
 
-function downVote(req, res) {
-    putVote(req, res, -1);
-}
+    //todo - retrieve user from headers
 
-function cancelVote(req, res) {
-    putVote(req, res, 0);
-}
+    if(!(await isUsernameValidAsync(req.headers.username, res))) {
+        
+        sendToFrontend(403, { error: "not authorized to vote" }, res);
+    } else {
 
-
-//processes the request to cast a vote
-function putVote(req, res, vote) {
-    //first implementation - free for all
-    // console.log(req.params.id);
-    //const updateStatement = `UPDATE Post SET score = score + ${vote} WHERE Id = ${connection.escape(req.params.id)}`;
-    //let username = connection.escape(req.headers.username);
-
-    //sqlQueryWithErrorHandler(updateStatement, () => {
-        // res.send(result);
-    //    retrieveImpactedPost(res, req.params.id, username);
-    //});
-
-    
-    // if(!isUsernameValid(req.headers.username)) {
-    //     // user check (invalid username)?
-    //     res.status(403).json({error: "not authorized to vote"});
-    // } else if(!isPostNumberValid(req.params.id)) {
-    //     // post check (nonexistent post)
-    //     res.status(404).json({error: "post not found"});
-    // } else {
-
-    isUsernameValid(req.headers.username, (usernameOk)=> { //this sounds like a horrible, horrible, horrible idea
-        if(!usernameOk) {
-            res.status(403).json({error: "not authorized to vote"});
+        if(!(await isPostNumberValidAsync(req.params.id, res))) {
+            sendToFrontend(404, { error: "post not found" }, res);
         } else {
-            isPostNumberValid(req.params.id, (idOk) => {
-                if(!idOk) {
-                    res.status(404).json({error: "post not found"});
-                } else {
-                    //this is where checking callbacks allow for the query proper
 
+            let postId = connection.escape(req.params.id);
+            let username = connection.escape(req.headers.username);
 
-                    
-                    
-                    // insert into .. on duplicate key update for votes table
-                    let postId = connection.escape(req.params.id);
-                    let username = connection.escape(req.headers.username);
-                    
-                    const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
-                    `VALUES ( `+
-                    `   ${postId}, `+
-                    `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
-                    `   ${vote} `+
-                    `) ` +
-                    `ON DUPLICATE KEY UPDATE vote = ${vote}`;
-                    
-                    sqlQueryWithErrorHandler(insertStatement, (result)=> {
-                        console.log(result);
-                        retrieveImpactedPost(res, req.params.id, username);
-                    });
-                
-                    
-                    //thi is where checking callbacks end
-                }
+            const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
+                                        `VALUES ( `+
+                                        `   ${postId}, `+
+                                        `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
+                                        `   ${vote} `+
+                                        `) ` +
+                                        `ON DUPLICATE KEY UPDATE vote = ${vote}`;
+
+            handleSqlWithError(insertStatement, res)
+                .then(result => {
+                    console.log(result);
+                    retrieveImpactedPost(res, req.params.id, req.headers.username)
             });
+                    
         }
-    });
-
+    }
 }
+
+
 
 //select the last impacted post and return it as an object
 function retrieveImpactedPost(res, id, username) {
@@ -218,14 +223,80 @@ function retrieveImpactedPost(res, id, username) {
                                     `WHERE Post.Id = ${id} ` +
                                     `GROUP BY Post.Id `;
 
-
-        sqlQueryWithErrorHandler(selectStatement, result => {
-            //todo check if result is not empty?
+    handleSqlWithError(selectStatement, res)
+        .then(result=> {
             console.log(result);
-            res.status(200).json(rowToPostObject(result[0])); 
+            sendToFrontend(200, rowToPostObject(result[0]), res); //dangerous assumption?
+        });
+
+    // sqlQueryWithErrorHandler(selectStatement, result => {
+    //     //todo check if result is not empty?
+    //     console.log(result);
+    //     res.status(200).json(rowToPostObject(result[0])); 
+    // });
+}
+
+
+//returns true if database has a user in it, false otherwise
+
+async function isUsernameValidAsync (username, res) {
+    const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${connection.escape(username)}`;
+    return (await handleSqlWithError(select,res)[0]['COUNT(*)'] !== 0);
+}
+
+//returns true if database has post with given id in it, false otherwise
+async function isPostNumberValidAsync(id, res) {
+    const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${connection.escape(id)}`;
+    return (await handleSqlWithError(select,res)[0]['COUNT(*)'] !== 0);
+}
+
+//takes the promise, waits for it and checks it for errors
+function handleSqlWithError(sqlStatement, res) {
+    return sqlPromise(sqlStatement)
+            .then(
+                result => result,
+                error => databaseError(error, res)
+            );
+
+}
+
+function sendToFrontend(status, delivery, res) {
+    res.status(status).json(delivery);
+}
+
+
+//makes a promise out of the connection.query call
+function sqlPromise(sqlStatement) {
+    return new Promise((resolve, reject) => {
+        connection.query(sqlStatement, (error, result) => {
+            if(error) {
+                reject(error);
+            } else {
+                resolve(result);
+            }
+        });
     });
 }
 
+//sends database error if something went wrong while making db query
+function databaseError(error, res) {
+    console.error(error);
+    res.status(500).json({ error: 'error connecting to the database'});
+    connection.end();
+    connection.connect();
+}
+
+
+
+
+module.exports = router;
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//old implementation
 
 //outsourcing of error handling
 function sqlQueryWithErrorHandler(query, resultHandler) {
@@ -237,11 +308,6 @@ function sqlQueryWithErrorHandler(query, resultHandler) {
         }
     });
 }
-
-//this is getting a bit long, maybe I should break this up?
-//nah.
-
-//TODO deal with the query delay.
 
 //returns true if database has a user in it, false otherwise
 function isUsernameValid (username, callback) {
@@ -257,6 +323,7 @@ function isUsernameValid (username, callback) {
     });
 }
 
+
 //returns true if database has post with given id in it, false otherwise
 function isPostNumberValid (id, callback) {
     const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${connection.escape(id)}`;
@@ -270,7 +337,46 @@ function isPostNumberValid (id, callback) {
     });
 }
 
-function databaseError(error) {
-    console.error(error);
-    res.status(500).json({ error: 'error connecting to the database'});
+
+//processes the request to cast a vote
+function putVote(req, res, vote) {
+    
+
+    isUsernameValid(req.headers.username, (usernameOk)=> { //this sounds like a horrible, horrible, horrible idea
+        if(!usernameOk) {
+            res.status(403).json({error: "not authorized to vote"});
+        } else {
+            isPostNumberValid(req.params.id, (idOk) => {
+                if(!idOk) {
+                    res.status(404).json({error: "post not found"});
+                } else {
+                    //this is where checking callbacks allow for the query proper
+
+
+                    
+                    
+                    // insert into .. on duplicate key update for votes table
+                    let postId = connection.escape(req.params.id);
+                    let username = connection.escape(req.headers.username);
+                    
+                    const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
+                                                `VALUES ( `+
+                                                `   ${postId}, `+
+                                                `   (SELECT Id FROM pseuditor WHERE username = ${username}), `+
+                                                `   ${vote} `+
+                                                `) ` +
+                                                `ON DUPLICATE KEY UPDATE vote = ${vote}`;
+                                            
+                    sqlQueryWithErrorHandler(insertStatement, (result)=> {
+                        console.log(result);
+                        retrieveImpactedPost(res, postId, username);
+                    });
+                
+                    
+                    //thi is where checking callbacks end
+                }
+            });
+        }
+    });
+
 }
