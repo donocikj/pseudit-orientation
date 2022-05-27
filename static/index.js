@@ -2,10 +2,13 @@
 
 
 const mainElement = document.querySelector(`main`);
-const submissionForm = document.querySelector(`#submissionForm`);
+const submissionForm = document.forms.submissionForm;
+const loginContainer = document.querySelector(`#loginContainer`);
+const loginForm = document.forms.loginForm;
 
-const postList = { posts: [] };
+const postMap = {};
 
+let username = undefined;
 
 //let user = 'anonymous'
 
@@ -19,8 +22,13 @@ document.querySelector(`header`).addEventListener(`click`, (e) => {
 ////////////////////////////
 //register even listeners
 
+//on load - check if user is logged in
+document.addEventListener(`DOMContentLoaded`, checkCredentials);
 //on load - grab all the available posts and dump them onto the page
-document.addEventListener(`DOMContentLoaded`, fetchAllPosts)
+document.addEventListener(`DOMContentLoaded`, fetchAllPosts);
+
+//login form
+loginForm.addEventListener(`submit`, loginAttempt);
 
 //submit button - create form for entering new post
 document.querySelector(`#submissionFormButton`).addEventListener(`click`, showSubmissionForm);
@@ -47,27 +55,104 @@ mainElement.addEventListener(`click`, mainAreaClick);
 ///////////////////////////
 //implementation 
 
+function checkCredentials() {
+
+    if(localStorage.getItem(`username`) !== undefined) {
+        loginFormReplaceWithLogout();
+    }
+
+    // console.log(`identity crisis - fetch`)
+    // fetch(`/whoami`)
+    //     .then(
+    //         response => {
+    //             // console.log(`identity crisis - resolve`);
+    //             // console.log(response);
+    //             return response.json();
+    //         },
+    //         problem => console.error(problem)
+    //     ).then( answer => {
+    //         // console.log(answer);
+    //         localStorage.getItem(`username`) = answer.username;
+    //         if(username !== undefined) {
+    //             loginFormReplaceWithLogout();
+    //             console.log(`hello, ${localStorage.getItem(`username`)}`);
+    //         } else {
+    //             console.log(`hello, signature illegible`);
+    //         }
+    //     })
+    //     .catch(error => console.error(error));
+    
+}
+
 //retrieve all posts from the database by accessing the appropriate GET endpoint of backend.
 function fetchAllPosts(e) {
     console.log(e);
 
     fetch(`/posts/`)
     //examine response for statuses...
-        .then(response => response.json())
+        .then(response => {
+            //console.log(response.headers)
+            return response.json();
+        })
     //examine the post list
         .then(returnObject => {
-            console.log(returnObject)
-            postList.posts = []; //make sure it's empty
+            //console.log(returnObject)
+            postMap.posts = {}; //make sure it's empty
             mainElement.innerHTML = ``;
             returnObject.posts.forEach(post => { 
                 //foreach - create element and save it to the variable for future reference
                 let newPost = createPostElement(post);
-                postList.posts.push(newPost);
+                postMap[post.id] = newPost;
             });
-            console.log(submissionForm);
+            //console.log(submissionForm);
+            console.log(postMap);
         })
         .catch(problem => console.error(problem));
 }
+
+//TODO something that works
+function loginAttempt(e) {
+    e.preventDefault();
+    localStorage.setItem(`username`, loginForm.username.value )
+    //username = loginForm.username.value;
+    loginForm.username.value = ``;
+    loginForm.password.value = ``;
+
+    loginFormReplaceWithLogout();
+
+    // e.preventDefault();
+
+    // fetch(`/login`)
+    //     .then(response => {
+    //         console.log(response);
+    //         checkCredentials();
+    //     },
+    //         problem => console.error(problem));
+
+}
+
+//TODO something that works
+function logout(e) {
+    
+    localStorage.removeItem(`username`);
+
+    loginFormReinstate();
+
+    // fetch(`/logout`, {
+    //     headers: { //ugly, but seems to work.
+    //         "authorization": "Basic bG9nb3V0OmxvZ291dA==" //logout:logout
+    //     }
+    // })
+    //     .then(response => {
+    //         document.execCommand("ClearAuthenticationCache");
+    //         location.reload(true);
+    //         // console.log(response)
+    //         // checkCredentials();
+    //         // loginFormReinstate();
+    //     },
+    //     problem => console.error(problem));
+}
+
 
 //creates a form element on top of existing posts to fill in.
 function showSubmissionForm(e) {
@@ -93,7 +178,8 @@ function submitPost(e) {
     fetch(`/posts`, {
         method: `POST`,
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "username": localStorage.getItem(`username`)
         },
         body: JSON.stringify(newPost)
     })
@@ -132,6 +218,28 @@ function mainAreaClick(e) {
 
 ///////////////////////////
 //helper functions
+
+//replaces the login form with username and logout button
+function loginFormReplaceWithLogout() {
+    loginContainer.innerHTML=``;
+    const greetingElement = document.createElement(`h3`);
+    greetingElement.textContent = `Hello, ${localStorage.getItem(`username`)}`;
+
+    const logoutButton = document.createElement(`button`);
+    logoutButton.textContent = `Logout`;
+    logoutButton.addEventListener(`click`, logout);
+
+    loginContainer.appendChild(greetingElement);
+    loginContainer.appendChild(logoutButton);
+
+}
+
+function loginFormReinstate() {
+    loginContainer.innerHTML=``;
+    loginContainer.appendChild(loginForm);
+}
+
+
 
 //accepts object with all post related data required to generate an element
 function createPostElement(post) {
@@ -231,10 +339,15 @@ function downVote(id) {
 
 function vote(id, direction) {
     fetch(`/posts/${id}/${direction}vote`, {
-        method: `PUT`
+        method: `PUT`,
         //headers
+        headers: {
+            "username": localStorage.getItem(`username`)
+        }
     }).then(
-        result => console.log(result),
+        () => {
+            location.reload(true);
+        },
         problem => console.error(problem)
     );
 }
@@ -247,8 +360,11 @@ function modifyPost(postContainer) {
 //receives id of post to be deleted
 function deletePost(id) {
     fetch(`/posts/${id}`, {
-        method: `DELETE`
+        method: `DELETE`,
         //headers
+        headers: {
+            "username": localStorage.getItem(`username`)
+        }
     }).then(
         result => {
             console.log(result);
@@ -282,6 +398,6 @@ function howLongAgo(timestamp) {
     });
 
     return `${ago[0]!==0 ? ago[0] + " days " : ""}${ago[1]!==0 ? ago[1] + " hours " : ""}`+
-           `${ago[2]!==0 ? ago[2] + " minutes " : ""}${ago[3]!==0 ? ago[3] + " seconds " : ""}`
+           `${ago[2]!==0 ? ago[2] + " minutes " : ""}${ago[3]!==0 ? ago[3] + " seconds " : ""} ago`
     
 }

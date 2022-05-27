@@ -3,7 +3,7 @@
 const express = require(`express`);
 const router = express.Router();
 
-const connection = require(`../db`);
+const db = require(`../db`);
 
 router.use(express.json());
 
@@ -38,7 +38,7 @@ function listPosts(req, res) {
     //const selectStatement = `SELECT * FROM Post ORDER BY postedOn DESC`;
 
     //retrieve username from headers
-    let username = connection.escape(req.headers.username);
+    let username = db.connection.escape(req.headers.username);
     console.log(username);
 
     //oh boy.
@@ -65,7 +65,7 @@ function listPosts(req, res) {
     //     res.status(200).json({posts: rowListToObjectList(result)});
     // });
 
-    handleSqlWithError(selectStatement, res)
+    db.handleSqlWithError(selectStatement, res)
         .then(result => sendToFrontend(200, {posts: rowListToObjectList(result)}, res));
 }
 
@@ -76,14 +76,14 @@ function submitPost(req, res) {
 
     let post = {
         postedOn: new Date(),
-        title: connection.escape(req.body.title),
-        url: connection.escape(req.body.url),
+        title: db.connection.escape(req.body.title),
+        url: db.connection.escape(req.body.url),
     }
 
     console.log(post);
 
-    let timestamp = connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '));
-    let username = connection.escape(req.headers.username);
+    let timestamp = db.connection.escape(post.postedOn.toISOString().slice(0, 19).replace('T', ' '));
+    let username = db.connection.escape(req.headers.username);
 
     const insertStatement = `INSERT INTO Post (postedOn, title, url, postOwner) ` +
                                 `VALUES (${timestamp}, `+
@@ -98,7 +98,7 @@ function submitPost(req, res) {
     //     retrieveImpactedPost(res, result.insertId, username);
     // });
 
-    handleSqlWithError(insertStatement, res)
+    db.handleSqlWithError(insertStatement, res)
         .then(result=> {
             retrieveImpactedPost(res, result.insertId, username);
     });
@@ -126,11 +126,10 @@ function deletePost(req, res) {
     
 
     //check user authority?
-
     //delete post
-    const deleteStatement = `DELETE FROM Post WHERE Id = ${connection.escape(req.params.id)}`;
+    const deleteStatement = `DELETE FROM Post WHERE Id = ${db.connection.escape(req.params.id)}`;
 
-    handleSqlWithError(deleteStatement, res)
+    db.handleSqlWithError(deleteStatement, res)
     console.log(deleteStatement);
 }
 
@@ -187,8 +186,8 @@ async function putVoteAsync(req, res, vote) {
             sendToFrontend(404, { error: "post not found" }, res);
         } else {
 
-            let postId = connection.escape(req.params.id);
-            let username = connection.escape(req.headers.username);
+            let postId = db.connection.escape(req.params.id);
+            let username = db.connection.escape(req.headers.username);
 
             const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
                                         `VALUES ( `+
@@ -198,7 +197,7 @@ async function putVoteAsync(req, res, vote) {
                                         `) ` +
                                         `ON DUPLICATE KEY UPDATE vote = ${vote}`;
 
-            handleSqlWithError(insertStatement, res)
+            db.handleSqlWithError(insertStatement, res)
                 .then(result => {
                     console.log(result);
                     retrieveImpactedPost(res, req.params.id, req.headers.username)
@@ -212,8 +211,8 @@ async function putVoteAsync(req, res, vote) {
 
 //select the last impacted post and return it as an object
 function retrieveImpactedPost(res, id, username) {
-    //const selectStatement = `SELECT * FROM Post WHERE Id = ${connection.escape(id)}`;
-    username = connection.escape(username);
+    //const selectStatement = `SELECT * FROM Post WHERE Id = ${db.connection.escape(id)}`;
+    username = db.connection.escape(username);
 
     const selectStatement = `SELECT Post.Id as POST_ID, ` +
                                     `title, `+
@@ -233,7 +232,7 @@ function retrieveImpactedPost(res, id, username) {
                                     `WHERE Post.Id = ${id} ` +
                                     `GROUP BY Post.Id `;
 
-    handleSqlWithError(selectStatement, res)
+    db.handleSqlWithError(selectStatement, res)
         .then(result=> {
             console.log(result);
             sendToFrontend(200, rowToPostObject(result[0]), res); //dangerous assumption?
@@ -250,49 +249,24 @@ function retrieveImpactedPost(res, id, username) {
 //returns true if database has a user in it, false otherwise
 
 async function isUsernameValidAsync (username, res) {
-    const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${connection.escape(username)}`;
-    return ((await handleSqlWithError(select,res))[0]['COUNT(*)'] !== 0);
+    const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${db.connection.escape(username)}`;
+    return ((await db.handleSqlWithError(select,res))[0]['COUNT(*)'] !== 0);
 }
 
 //returns true if database has post with given id in it, false otherwise
 async function isPostNumberValidAsync(id, res) {
-    const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${connection.escape(id)}`;
-    return ((await handleSqlWithError(select,res))[0]['COUNT(*)'] !== 0);
+    const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${db.connection.escape(id)}`;
+    return ((await db.handleSqlWithError(select,res))[0]['COUNT(*)'] !== 0);
 }
 
-//takes the promise, waits for it and checks it for errors
-function handleSqlWithError(sqlStatement, res) {
-    return sqlPromise(sqlStatement)
-            .then(result => result)
-            .catch(error => databaseError(error));
-
-}
 
 function sendToFrontend(status, delivery, res) {
     res.status(status).json(delivery);
 }
 
 
-//makes a promise out of the connection.query call
-function sqlPromise(sqlStatement) {
-    return new Promise((resolve, reject) => {
-        connection.query(sqlStatement, (error, result) => {
-            if(error) {
-                reject(error);
-            } else {
-                resolve(result);
-            }
-        });
-    });
-}
 
-//sends database error if something went wrong while making db query
-function databaseError(error, res) {
-    console.error(error);
-    res.status(500).json({ error: 'error connecting to the database'});
-    connection.end();
-    connection.connect();
-}
+
 
 
 
@@ -308,7 +282,7 @@ module.exports = router;
 
 // // outsourcing of error handling
 // function sqlQueryWithErrorHandler(query, resultHandler) {
-//     connection.query(query, (error, result)=> {
+//     db.connection.query(query, (error, result)=> {
 //         if(error) {
 //             databaseError(error);
 //         } else {
@@ -319,9 +293,9 @@ module.exports = router;
 
 // //returns true if database has a user in it, false otherwise
 // function isUsernameValid (username, callback) {
-//     const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${connection.escape(username)}`;
+//     const select = `SELECT COUNT(*) FROM pseuditor WHERE pseuditor.username = ${db.connection.escape(username)}`;
 //     let outcome = false;
-//     connection.query(select, (error, result) =>{
+//     db.connection.query(select, (error, result) =>{
 //     //sqlQueryWithErrorHandler(select, result => {
 //         if(error) databaseError(error);
 //         console.log(result);
@@ -334,9 +308,9 @@ module.exports = router;
 
 // //returns true if database has post with given id in it, false otherwise
 // function isPostNumberValid (id, callback) {
-//     const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${connection.escape(id)}`;
+//     const select = `SELECT COUNT(*) FROM post WHERE post.Id = ${db.connection.escape(id)}`;
 //     let outcome = false;
-//     connection.query(select, (error, result) =>{
+//     db.connection.query(select, (error, result) =>{
 //         //sqlQueryWithErrorHandler(select, result => {
 //         if(error) databaseError(error);
 //         console.log(result);
@@ -364,8 +338,8 @@ module.exports = router;
                     
                     
 //                     // insert into .. on duplicate key update for votes table
-//                     let postId = connection.escape(req.params.id);
-//                     let username = connection.escape(req.headers.username);
+//                     let postId = db.connection.escape(req.params.id);
+//                     let username = db.connection.escape(req.headers.username);
                     
 //                     const insertStatement = `INSERT INTO vote (PostId, UserID, Vote) `+
 //                                                 `VALUES ( `+

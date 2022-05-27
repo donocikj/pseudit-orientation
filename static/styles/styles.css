@@ -59,6 +59,8 @@ button {
     width: 96%;
     padding: 2%;
 
+    display:block;
+
     text-transform: uppercase;
     font-size: 1.3rem;
     font-weight: bold;

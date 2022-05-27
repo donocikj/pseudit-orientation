@@ -18,7 +18,15 @@
     <div class="content">
         <aside>
             <nav>
-                <div id="loginContainer"></div>
+                <div id="loginContainer">
+                    <form action="" name="loginForm">
+                        <label for="loginUsername">Username: </label>
+                        <input type="text" name="username" id="loginUsername" required>
+                        <label for="loginPassword">Password:</label>
+                        <input type="password" name="password" id="loginPassword" required>
+                        <button type="submit" name="login" id="loginButton">Login</button>
+                    </form>
+                </div>
             </nav>
             <button id="submissionFormButton">Submit a new post</button>
             
