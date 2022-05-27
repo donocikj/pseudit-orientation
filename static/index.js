@@ -391,6 +391,7 @@ function vote(id, direction) {
 
 //receives handle to container element of a post to be modified. Should substitute the container for a modification form.
 function preparePostModification(postContainer) {
+    let id = postContainer.getAttribute(`data-id`);
 
     if(openModification) { //there can be only one open modification
         mainElement.replaceChild(postMap[openModification.getAttribute(`data-id`)].postElement, openModification);
@@ -398,7 +399,7 @@ function preparePostModification(postContainer) {
 
     console.log(postContainer);
     //make substitute container
-    let modifyContainer = assembleModifyForm(postContainer.getAttribute(`data-id`));
+    let modifyContainer = assembleModifyForm(id);
     console.log(modifyContainer);
     //swap it in
     mainElement.replaceChild(modifyContainer, postContainer);
@@ -408,7 +409,7 @@ function preparePostModification(postContainer) {
     document.forms.modifyForm.addEventListener(`submit`, (e) => {
         e.preventDefault();
         console.log(e);
-        //modifyPost()
+        modifyPost(id, document.forms.modifyForm.newTitle.value, document.forms.modifyForm.newUrl.value);
     })
 
 
@@ -418,6 +419,27 @@ function preparePostModification(postContainer) {
         openModification = null;
     })
 
+
+}
+
+function modifyPost(id, title, url) {
+
+    fetch(`/posts/${id}`, {
+        method: `PUT`,
+        headers: {
+            "Content-Type": "application/json",
+            "username": localStorage.getItem(`username`)
+        },
+        body: JSON.stringify({
+            title: title,
+            url: url
+        })
+    }).then(
+        result=> {
+            location.reload(true);
+        },
+        problem=> console.error(problem)
+    );
 
 }
 
@@ -448,6 +470,7 @@ function assembleModifyForm (id) {
     let urlInputElement = document.createElement(`input`);
     urlInputElement.setAttribute(`type`, `url`);
     urlInputElement.setAttribute(`required`, ``);
+    urlInputElement.setAttribute(`name`, `newUrl`);
     urlInputElement.setAttribute(`id`, `modifyUrl`);
     urlInputElement.value = postMap[id].postData.url;
     

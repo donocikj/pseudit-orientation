@@ -27,7 +27,8 @@ router.put(`/:id/cancelvote`, cancelVote)
 router.delete(`/:id/`, deletePost);
 
 //put (patch?) edit
-//router.put()
+router.put(`/:id/`, updatePost);
+
 
 /////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
@@ -135,6 +136,50 @@ function deletePost(req, res) {
 
 //update the post with given identifier
 
+async function updatePost(req, res) {
+
+    let username = req.headers.username;
+    let id = req.params.id
+
+    //confirm that post exists
+    if(!(await isPostNumberValidAsync(id, res))) {
+
+        sendToFrontend(404, { error: "post not found" }, res);
+
+    } else {
+        let accessedPost = await retrievePostCompoundById(db.connection.escape(id), res, username);
+
+        let update = req.body;
+        console.log(accessedPost);
+        console.log(update);
+
+        if (!username === accessedPost[0].username) {
+            sendToFrontend(403, { error: "not authorized to make the change" }, res);
+        } else {
+
+            let timestamp = db.connection.escape(new Date().toISOString().slice(0, 19).replace('T', ' '));
+
+
+
+            const updateStatement = `UPDATE Post SET title = ${db.connection.escape(update.title)}, `+
+                                                    ` url = ${db.connection.escape(update.url)}, ` +
+                                                    ` postedOn = ${timestamp} ` +
+                                                    `WHERE id = ${db.connection.escape(id)}`;
+
+            db.handleSqlWithError(updateStatement, res)
+                .then(result => {
+                    console.log(result);
+                    retrieveImpactedPost(res, id, username);
+            });
+
+            //sendToFrontend(200, { message: "implementation pending" }, res);
+        }
+
+        
+        
+    }
+}
+
 
 ///////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////
@@ -207,11 +252,7 @@ async function putVoteAsync(req, res, vote) {
     }
 }
 
-
-
-//select the last impacted post and return it as an object
-function retrieveImpactedPost(res, id, username) {
-    //const selectStatement = `SELECT * FROM Post WHERE Id = ${db.connection.escape(id)}`;
+async function retrievePostCompoundById(id, res, username) {
     username = db.connection.escape(username);
 
     const selectStatement = `SELECT Post.Id as POST_ID, ` +
@@ -232,7 +273,35 @@ function retrieveImpactedPost(res, id, username) {
                                     `WHERE Post.Id = ${id} ` +
                                     `GROUP BY Post.Id `;
 
-    db.handleSqlWithError(selectStatement, res)
+    return await db.handleSqlWithError(selectStatement, res);
+
+}
+
+//select the last impacted post and return it as an object
+function retrieveImpactedPost(res, id, username) {
+    //const selectStatement = `SELECT * FROM Post WHERE Id = ${db.connection.escape(id)}`;
+    // username = db.connection.escape(username);
+
+    // const selectStatement = `SELECT Post.Id as POST_ID, ` +
+    //                                 `title, `+
+    //                                 `url, `+
+    //                                 `postedOn,  `+
+    //                                 `username,  `+
+    //                                 `SUM(Vote) AS score, `+
+    //                                 `(select Vote ` + //subquery for "My" posts
+    //                                 `    FROM Post ` + 
+    //                                 `    INNER JOIN vote ON post.Id = vote.PostId ` +
+    //                                 `    INNER JOIN pseuditor ON vote.UserID = pseuditor.Id ` +
+    //                                 `    WHERE pseuditor.username=${username} AND POST_ID=vote.PostId) as myvote `+
+    // //that last part could probably use some work but I ain't touching it unless I get around to some proper authentication.
+    //                                 `FROM Post `+
+    //                                 `   LEFT JOIN pseuditor ON post.postOwner=pseuditor.Id `+
+    //                                 `   LEFT JOIN vote ON post.Id = vote.PostID `+
+    //                                 `WHERE Post.Id = ${id} ` +
+    //                                 `GROUP BY Post.Id `;
+
+    // db.handleSqlWithError(selectStatement, res)
+    retrievePostCompoundById(id, res, username)
         .then(result=> {
             console.log(result);
             sendToFrontend(200, rowToPostObject(result[0]), res); //dangerous assumption?
