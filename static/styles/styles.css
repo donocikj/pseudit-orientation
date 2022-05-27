@@ -113,6 +113,10 @@ main {
     cursor: pointer;
 }
 
+.container .tools .accessible {
+    color: green;
+}
+
 .container h3 {
     grid-column: 2/4;
     grid-row: 2;
@@ -177,22 +181,22 @@ main {
 
 /* form elements */
 
-.container #titleLabel {
+.container #titleLabel, .container #modifyTitleLabel {
     grid-column: 1;
     grid-row: 2;
 }
 
-.container #urlLabel {
+.container #urlLabel, .container #urlLabel {
     grid-column: 1;
     grid-row: 3;
 }
 
-.container #linkTitle {
+.container #linkTitle, .container #modifyTitle {
     grid-column: 2/4;
     grid-row: 2;
 }
 
-.container #linkUrl {
+.container #linkUrl, .container #modifyUrl {
     grid-column: 2/4;
     grid-row: 3;
 
@@ -202,12 +206,12 @@ main {
     margin: 5px;
 }
 
-.container #submitNewPost {
+.container #submitNewPost, .container #modifyPost {
     grid-column: 3;
     grid-row: 4;
 }
 
-.container #cancelSubmission {
+.container #cancelSubmission, .container #cancelModify {
     grid-column: 3;
     grid-row: 1;
     width: 42px;

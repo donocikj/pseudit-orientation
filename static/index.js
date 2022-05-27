@@ -8,7 +8,9 @@ const loginForm = document.forms.loginForm;
 
 const postMap = {};
 
-let username = undefined;
+let openModification = undefined;
+
+//let username = undefined;
 
 //let user = 'anonymous'
 
@@ -57,7 +59,7 @@ mainElement.addEventListener(`click`, mainAreaClick);
 
 function checkCredentials() {
 
-    if(localStorage.getItem(`username`) !== undefined) {
+    if(localStorage.getItem(`username`)) {
         loginFormReplaceWithLogout();
     }
 
@@ -86,9 +88,14 @@ function checkCredentials() {
 
 //retrieve all posts from the database by accessing the appropriate GET endpoint of backend.
 function fetchAllPosts(e) {
-    console.log(e);
+    //console.log(e);
+    //console.log(localStorage.getItem(`username`));
 
-    fetch(`/posts/`)
+    fetch(`/posts/`, {
+        headers: {
+            "username": localStorage.getItem(`username`)
+        }
+    })
     //examine response for statuses...
         .then(response => {
             //console.log(response.headers)
@@ -102,10 +109,13 @@ function fetchAllPosts(e) {
             returnObject.posts.forEach(post => { 
                 //foreach - create element and save it to the variable for future reference
                 let newPost = createPostElement(post);
-                postMap[post.id] = newPost;
+                postMap[post.id] = {
+                    postElement: newPost,
+                    postData: post
+                }
             });
             //console.log(submissionForm);
-            console.log(postMap);
+            //console.log(postMap);
         })
         .catch(problem => console.error(problem));
 }
@@ -114,11 +124,13 @@ function fetchAllPosts(e) {
 function loginAttempt(e) {
     e.preventDefault();
     localStorage.setItem(`username`, loginForm.username.value )
-    //username = loginForm.username.value;
-    loginForm.username.value = ``;
-    loginForm.password.value = ``;
 
-    loginFormReplaceWithLogout();
+    location.reload(true);
+    //username = loginForm.username.value;
+    // loginForm.username.value = ``;
+    // loginForm.password.value = ``;
+
+    // loginFormReplaceWithLogout();
 
     // e.preventDefault();
 
@@ -135,8 +147,9 @@ function loginAttempt(e) {
 function logout(e) {
     
     localStorage.removeItem(`username`);
+    location.reload(true);
 
-    loginFormReinstate();
+    
 
     // fetch(`/logout`, {
     //     headers: { //ugly, but seems to work.
@@ -200,7 +213,10 @@ function hideSubmissionForm() {
 //click has been registered in the main area, possible vote
 function mainAreaClick(e) {
     console.log(e.composedPath());
-    if(e.target.classList.contains(`up`)) {
+    if(e.target.classList.contains(`voted`)) {
+        console.log(`upvoting post ${e.target.getAttribute(`data-postId`)} :)`);
+        cancelVote(e.target.getAttribute(`data-postId`));
+    } else if (e.target.classList.contains(`up`)) {
         console.log(`upvoting post ${e.target.getAttribute(`data-postId`)} :)`);
         upVote(e.target.getAttribute(`data-postId`));
     } else if (e.target.classList.contains(`down`)) {
@@ -208,7 +224,7 @@ function mainAreaClick(e) {
         downVote(e.target.getAttribute(`data-postId`));
     } else if (e.target.classList.contains(`modify`)) {
         console.log(`attempting to edit post ${e.composedPath()[2].getAttribute(`data-id`)}`);
-        modifyPost(e.composedPath()[2]);
+        preparePostModification(e.composedPath()[2]);
     } else if (e.target.classList.contains(`delete`)) {
         console.log(`attempting to delete post ${e.composedPath()[2].getAttribute(`data-id`)}`);
         deletePost(e.composedPath()[2].getAttribute(`data-id`));
@@ -243,6 +259,8 @@ function loginFormReinstate() {
 
 //accepts object with all post related data required to generate an element
 function createPostElement(post) {
+    //console.log(post);
+
     //container div
     let containerDiv = document.createElement(`div`);
     containerDiv.classList.add(`container`);
@@ -278,7 +296,15 @@ function createPostElement(post) {
     //upvote
     let upvoteImg = document.createElement(`img`);
     upvoteImg.classList.add(`up`);
-    upvoteImg.setAttribute(`src`, `/static/assets/upvote.png`); //todo check logged in user
+
+    if(post.vote === 1) {
+        upvoteImg.classList.add(`voted`);
+        upvoteImg.setAttribute(`src`, `/static/assets/upvoted.png`); 
+    }
+    else {
+        upvoteImg.setAttribute(`src`, `/static/assets/upvote.png`); 
+    }
+
     upvoteImg.setAttribute(`alt`, `upvote the post ${post.id}`); //
     upvoteImg.setAttribute(`data-postId`, post.id)
     voteField.appendChild(upvoteImg);
@@ -292,7 +318,15 @@ function createPostElement(post) {
     //downvote
     let downvoteImg = document.createElement(`img`);
     downvoteImg.classList.add(`down`);
-    downvoteImg.setAttribute(`src`, `/static/assets/downvote.png`); //todo check logged in user
+
+    if(post.vote === -1) {
+        downvoteImg.classList.add(`voted`);
+        downvoteImg.setAttribute(`src`, `/static/assets/downvoted.png`);
+    }
+    else {
+        downvoteImg.setAttribute(`src`, `/static/assets/downvote.png`);
+    }
+
     downvoteImg.setAttribute(`alt`, `downvote the post ${post.id}`); //
     downvoteImg.setAttribute(`data-postId`, post.id)
     voteField.appendChild(downvoteImg);
@@ -306,6 +340,8 @@ function createPostElement(post) {
 
     let modifyLink = document.createElement(`a`);
     modifyLink.classList.add(`modify`);
+    if (post.owner === localStorage.getItem(`username`))
+        modifyLink.classList.add(`accessible`);
     modifyLink.textContent = `Modify`;
     toolDiv.appendChild(modifyLink);
 
@@ -317,14 +353,15 @@ function createPostElement(post) {
     containerDiv.appendChild(toolDiv);
 
 
-
-    //compare owner with username
-
-
     //append to main
     mainElement.appendChild(containerDiv);
     return containerDiv;
 
+}
+
+//cancels vote on a post
+function cancelVote(id) {
+    vote(id, `cancel`);
 }
 
 //upvotes a post
@@ -353,7 +390,94 @@ function vote(id, direction) {
 }
 
 //receives handle to container element of a post to be modified. Should substitute the container for a modification form.
-function modifyPost(postContainer) {
+function preparePostModification(postContainer) {
+
+    if(openModification) { //there can be only one open modification
+        mainElement.replaceChild(postMap[openModification.getAttribute(`data-id`)].postElement, openModification);
+    }
+
+    console.log(postContainer);
+    //make substitute container
+    let modifyContainer = assembleModifyForm(postContainer.getAttribute(`data-id`));
+    console.log(modifyContainer);
+    //swap it in
+    mainElement.replaceChild(modifyContainer, postContainer);
+    openModification = modifyContainer;
+
+    //register event handler for submit
+    document.forms.modifyForm.addEventListener(`submit`, (e) => {
+        e.preventDefault();
+        console.log(e);
+        //modifyPost()
+    })
+
+
+    //register event handler for cancel -- replace the form with the container it previously replaced
+    document.querySelector(`#cancelModify`).addEventListener(`click`, (e) => {
+        mainElement.replaceChild(postContainer, modifyContainer);
+        openModification = null;
+    })
+
+
+}
+
+function assembleModifyForm (id) {
+
+    console.log(`assembling form for post ${id}`);
+
+    let formElement = document.createElement(`form`);
+    formElement.classList.add(`container`);
+    formElement.setAttribute(`name`,`modifyForm`);
+    formElement.setAttribute(`data-id`, id);
+
+    let titleInputElement = document.createElement(`input`);
+    titleInputElement.setAttribute(`type`, `text`);
+    titleInputElement.setAttribute(`required`, ``);
+    titleInputElement.setAttribute(`name`, `newTitle`);
+    titleInputElement.setAttribute(`id`, `modifyTitle`);
+    titleInputElement.value = postMap[id].postData.title;
+
+    let modifyTitleLabelElement = document.createElement(`label`);
+    modifyTitleLabelElement.setAttribute(`for`,`modifyTitle`);
+    modifyTitleLabelElement.setAttribute(`id`, `modifyTitleLabel`);
+    modifyTitleLabelElement.textContent = `Title: `;
+
+    formElement.appendChild(modifyTitleLabelElement)
+    formElement.appendChild(titleInputElement);
+
+    let urlInputElement = document.createElement(`input`);
+    urlInputElement.setAttribute(`type`, `url`);
+    urlInputElement.setAttribute(`required`, ``);
+    urlInputElement.setAttribute(`id`, `modifyUrl`);
+    urlInputElement.value = postMap[id].postData.url;
+    
+
+    let urlLabelElement = document.createElement(`label`);
+    urlLabelElement.setAttribute(`for`,`modifyUrl`);
+    urlLabelElement.setAttribute(`id`, `urlLabel`);
+    urlLabelElement.textContent = `Url: `;
+
+    formElement.appendChild(urlLabelElement)
+    formElement.appendChild(urlInputElement);
+
+    //modifyPost
+    let modifyButtonElement = document.createElement(`button`);
+    modifyButtonElement.setAttribute(`type`, `submit`);
+    modifyButtonElement.setAttribute(`id`, `modifyPost`);
+    modifyButtonElement.textContent = `Submit`;
+    formElement.appendChild(modifyButtonElement);
+
+    //cancelModify
+    let cancelModifyButtonElement = document.createElement(`button`);
+    cancelModifyButtonElement.setAttribute(`type`, `button`);
+    cancelModifyButtonElement.setAttribute(`id`, `cancelModify`);
+    cancelModifyButtonElement.textContent = `X`;
+    formElement.appendChild(cancelModifyButtonElement);
+
+    console.log(document.forms);
+    console.log(formElement);
+
+    return formElement;
 
 }
 
